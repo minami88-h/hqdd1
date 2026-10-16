@@ -153,7 +153,15 @@ $OOCD -s $SCRIPTS -f interface/stlink.cfg -f target/stm32g4x.cfg \
 
 ## ライセンス
 
-未設定です(`LICENSE` を追加してください)。`firmware/src/can_driver/` は [ACANFD_STM32](https://github.com/pierremolinaro/ACANFD_STM32)(MIT)から取り込んだもので、ライセンスは同ディレクトリの `LICENSE-ACANFD_STM32` を参照してください。ファームウェアは [SimpleFOC](https://simplefoc.com/)(MIT)を使用しています。
+**非商用であれば自由に使えます。商用利用は、著作権者以外には許可していません。**
+
+| 対象 | ライセンス |
+|---|---|
+| ソフトウェア(`firmware/`、`webui/` など) | [PolyForm Noncommercial 1.0.0](LICENSES/PolyForm-Noncommercial-1.0.0.md) |
+| ハードウェア設計・文書(`hardware/`、`docs/`) | [CC BY-NC 4.0](LICENSES/CC-BY-NC-4.0.txt) |
+| `firmware/src/can_driver/` | [ACANFD_STM32](https://github.com/pierremolinaro/ACANFD_STM32)(MIT)。同ディレクトリの `LICENSE-ACANFD_STM32` |
+
+個人・趣味・学習・教育・研究での利用や改変は自由です。商用利用を希望する場合は、[GitHub の Issues](https://github.com/minami88-h/hqdd1/issues) から連絡してください。詳しくは [LICENSE](LICENSE) を参照してください。ビルド時に取得される [SimpleFOC](https://simplefoc.com/) などのライブラリは、それぞれのライセンスに従います。
 
 ## 謝辞
 

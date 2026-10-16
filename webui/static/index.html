@@ -33,6 +33,7 @@ main>section>.card{flex:none}
 .row>.grow{flex:1}
 .seg{display:flex;gap:4px}.seg button{flex:1}
 input[type=range]{width:100%;padding:0}
+#banner{padding:6px 16px;background:var(--bad);color:#fff;font-size:13px}
 #dot{width:10px;height:10px;border-radius:50%;background:var(--bad);display:inline-block}
 #dot.ok{background:var(--ok)}
 .hide{display:none!important}
@@ -84,6 +85,7 @@ button.danger{border-color:var(--bad);color:var(--bad)}button.danger:hover{backg
   <span id="hint" class="warn hide">サーバ無しモード: UART(Web Serial)のみ。CANは server.py をローカルで起動してください</span>
   <span><span id="dot"></span> <span id="stat">未接続</span> <span id="rate" class="val" style="color:var(--mute)"></span></span>
 </header>
+<div id="banner" class="hide" role="alert"></div>
 
 <main>
 <aside>
@@ -349,7 +351,10 @@ function cmd(text, all){
 }
 
 function openWs(){
-  ws = new WebSocket(`ws://${location.host}/ws`);
+  // 公開ページ(https)から ws:// は作れず SecurityError で初期化が止まる。サーバ無しとして扱う
+  if (location.protocol!=="http:"){ backend=false; refreshRoute(); return; }
+  try{ ws = new WebSocket(`ws://${location.host}/ws`); }
+  catch(e){ backend=false; refreshRoute(); return; }
   ws.onopen = () => { backend=true; refreshRoute(); loadPorts().catch(()=>{}); };
   ws.onmessage = e => handle(JSON.parse(e.data));
   ws.onclose = () => { if (!backend) refreshRoute(); if (backend){ backend=false; if(!serialConn){ connected=false; $("dot").className=""; $("stat").textContent="サーバ切断"; } refreshRoute(); } setTimeout(openWs,3000); };
@@ -401,10 +406,23 @@ document.querySelectorAll("#linkmode button").forEach(b=>b.onclick=()=>{
   document.querySelectorAll("#linkmode button").forEach(x=>x.classList.toggle("on",x===b));
   $("canopts").classList.toggle("hide",linkMode!=="can"); $("uartopts").classList.toggle("hide",linkMode!=="uart");
   $("stopall").classList.toggle("hide",linkMode!=="uart");
-  $("devid").querySelector('[value="-1"]').disabled = linkMode==="uart";
-  if (linkMode==="uart" && $("devid").value==="-1") $("devid").value="1";
+  syncIdOpt();
   updateNotes();
 });
+let bannerT;
+function banner(t){ const b=$("banner"); b.textContent=t; b.classList.remove("hide"); clearTimeout(bannerT); bannerT=setTimeout(()=>b.classList.add("hide"),15000); }
+const sleep = ms => new Promise(r=>setTimeout(r,ms));
+// UARTのID「自動」はブラウザ直結(Web Serial)の時だけ使える
+let idTouched=false;
+function syncIdOpt(){
+  const auto=$("devid").querySelector('[value="-1"]'), okAuto=linkMode==="can" || useWebSerial();
+  auto.disabled=!okAuto;
+  if (linkMode==="uart"){
+    if (useWebSerial() && !idTouched) $("devid").value="-1";
+    else if (!okAuto && $("devid").value==="-1") $("devid").value="1";
+  }
+}
+$("devid").onchange=()=>{ idTouched=true; };
 function refreshRoute(){
   const web=!!navigator.serial, r=$("route");
   r.querySelector('[value=web]').disabled=!web; r.querySelector('[value=server]').disabled=!backend;
@@ -414,13 +432,14 @@ function refreshRoute(){
   canBtn.disabled=!backend; canBtn.title=backend?"":"CANはサーバ(server.py)経由でのみ使えます";
   if (!backend && linkMode==="can") document.querySelector('#linkmode [data-m=uart]').click();
   $("portlbl").classList.toggle("hide", r.value==="web");
+  syncIdOpt();
   if (!backend && !web) $("stat").textContent="サーバ未接続 / このブラウザはWeb Serial非対応(Chrome/Edgeを使用)";
 }
 $("route").onchange=()=>{ routeTouched=true; refreshRoute(); };
 $("conn").onclick=()=>{
   if (connected){ send({type:"disconnect"}); return; }
   const stop_on_close=$("stoponclose").checked, dev_id=+$("devid").value;
-  if (linkMode==="uart" && dev_id<0){ log("UARTではIDを指定してください(同じバスの複数台を区別するため)","err"); return; }
+  if (linkMode==="uart" && dev_id<0 && !useWebSerial()){ banner("サーバ経由のUARTではIDを指定してください"); return; }
   send(linkMode==="can"
     ? {type:"connect",mode:"can",iface:$("iface").value,dev_id,stop_on_close}
     : {type:"connect",mode:"uart",port:$("port").value,baud:+$("baud").value,dev_id,stop_on_close});
@@ -544,45 +563,108 @@ function updateNotes(){
 
 // ---------------- Web Serial 直結(サーバ不要、UARTのみ) ----------------
 const KVRE=/(\w+)=(-?\d+(?:\.\d+)?)/g, GAINRE=/^GAIN (\w\w) (-?[\d.]+(?:e-?\d+)?)$/;
+function friendly(e){
+  const n=e&&e.name, m=String((e&&e.message)||e);
+  if (n==="NotFoundError") return "ポートが選択されませんでした";
+  if (n==="NetworkError" || /Failed to open/i.test(m)) return "ポートを開けません。他のアプリ(server.py、シリアルモニタ、別のタブ)が使用中でないか確認してください";
+  if (n==="InvalidStateError") return "ポートが既に開かれています。USBを抜き差しして、ページを再読み込みしてください";
+  return m;
+}
 async function serialOp(o){
   try{
-    if (o.type==="connect"){
-      const port=await navigator.serial.requestPort();
-      await port.open({baudRate:o.baud});
-      serialConn={port,writer:port.writable.getWriter(),reader:port.readable.getReader(),stop:o.stop_on_close,cap:null,t0:performance.now(),id:o.dev_id};
-      handle({type:"status",connected:true,kind:"uart"});
-      serialRead(serialConn);
-      // 共有バスでテレメトリが衝突しないよう、全台を黙らせてから対象だけ有効にする
-      await serialWrite("@* T0"); await new Promise(r=>setTimeout(r,50)); await serialWrite("@"+o.dev_id+" T1");
-    } else if (o.type==="cmd"){
+    if (o.type==="connect") await serialConnect(o);
+    else if (o.type==="cmd"){
+      if (!serialConn) throw new Error("未接続");
+      if (serialConn.id<0 && !o.all) throw new Error("IDを検出中です。少し待ってください");
       await serialWrite((o.all?"@* ":"@"+serialConn.id+" ")+o.text);
       handle({type:"log",dir:"tx",text:(o.all?"[全台] ":"")+o.text});
-    } else if (o.type==="disconnect"){ await serialClose(true); }
-  }catch(e){ log(String(e),"err"); if (o.type==="connect") serialConn=null; }
+    } else if (o.type==="disconnect") await serialClose(true);
+  }catch(e){ banner("シリアル: "+friendly(e)); log(String(e),"err"); }
 }
-function serialWrite(line){ return serialConn.writer.write(new TextEncoder().encode(line+"\n")); }
+async function serialConnect(o){
+  if (serialConn) return;
+  const port=await navigator.serial.requestPort();
+  // 前回の接続が中途半端に残っていたら閉じる(残っていると「既に開いている」で接続できなくなる)
+  if (port.readable || port.writable){ try{ await port.close(); }catch{} }
+  await port.open({baudRate:o.baud, bufferSize:8192});
+  const c={port,writer:port.writable.getWriter(),reader:null,stop:o.stop_on_close,cap:null,t0:performance.now(),
+           id:o.dev_id,seen:new Set(),alive:true,rx:0,gotTelem:false,done:null,watch:null};
+  serialConn=c;
+  handle({type:"status",connected:true,kind:"uart"});
+  c.done=serialRead(c);
+  c.watch=setTimeout(()=>noData(c),4500);
+  if (c.id>=0) await serialSelect(c,c.id); else autoDetect(c);
+}
+// 共有バスでテレメトリが衝突しないよう、全台を黙らせてから対象だけ有効にする
+async function serialSelect(c,id){
+  c.id=id;
+  await serialWriteTo(c,"@* T0"); await sleep(50); await serialWriteTo(c,"@"+id+" T1");
+}
+// ID「自動」: 基板は起動時からテレメトリ("#<id> …")を流すので、最初に見えたIDを使う
+async function autoDetect(c){
+  for (let phase=0; phase<2 && c.alive && c.seen.size===0; phase++){
+    if (phase===1) await serialWriteTo(c,"@* T1");   // 前回のセッションで黙らせた基板を起こす
+    await sleep(1500);
+  }
+  if (!c.alive) return;
+  if (c.seen.size===0){ banner("基板のIDを検出できません(データが届いていません)。配線・baud・IDを確認してください"); return; }
+  const ids=[...c.seen].sort((a,b)=>a-b);
+  if (ids.length>1) banner(`複数の基板を検出: ID ${ids.join(", ")}。最小のID ${ids[0]} を使います。変える場合はIDを選んで接続し直してください`);
+  $("devid").value=String(ids[0]);
+  log(`IDを自動検出: ${ids[0]}`);
+  await serialSelect(c,ids[0]);
+}
+function noData(c){
+  if (!c.alive || serialConn!==c) return;
+  if (c.rx===0) banner(`基板からデータが届きません。①IDが違う可能性(ID「自動」で接続し直してください) ②配線(アダプタTXD→基板PA15、RXD→基板PA2、GND共通) ③baud ④基板の電源 を確認してください`);
+  else if (!c.gotTelem) banner(`ID ${c.id<0?"(検出中)":c.id} のテレメトリが届きません。IDが違う可能性があります(ID「自動」で接続してください)`);
+}
+function serialWriteTo(c,line){ return c.writer.write(new TextEncoder().encode(line+"\n")); }
+function serialWrite(line){ return serialWriteTo(serialConn,line); }
 async function serialClose(sendStop){
-  const c=serialConn; if(!c) return; serialConn=null;
-  try{ if (sendStop) await c.writer.write(new TextEncoder().encode("@"+c.id+" S\n")); }catch{}
-  try{ await c.reader.cancel(); }catch{}
-  try{ c.reader.releaseLock(); c.writer.releaseLock(); await c.port.close(); }catch{}
+  const c=serialConn; if(!c) return;
+  clearTimeout(c.watch);
+  try{ if (sendStop && c.id>=0) await Promise.race([serialWriteTo(c,"@"+c.id+" S"), sleep(500)]); }catch{}
+  c.alive=false;
+  try{ if (c.reader) await c.reader.cancel(); }catch{}
+  try{ await c.done; }catch{}            // 読み取りループがロックを手放すのを待つ
+  await serialRelease(c);
+  serialConn=null;
   handle({type:"status",connected:false,kind:null});
+}
+async function serialRelease(c){
+  try{ c.writer.releaseLock(); }catch{}
+  try{ await c.port.close(); }catch(e){ log("ポートを閉じられません: "+e,"err"); }
 }
 async function serialRead(c){
   const dec=new TextDecoder(); let acc="";
-  try{
-    for(;;){
-      const {value,done}=await c.reader.read(); if(done) break;
-      acc+=dec.decode(value,{stream:true});
-      let i; while((i=acc.indexOf("\n"))>=0){ serialLine(c,acc.slice(0,i).trim()); acc=acc.slice(i+1); }
-    }
-  }catch(e){ if (serialConn===c) log("シリアル切断: "+e,"err"); }
-  if (serialConn===c){ serialConn=null; handle({type:"status",connected:false,kind:null}); }
+  // 読み取りエラーのうち致命的でないもの(フレーミング等)は readable が残るので、読み直して続ける
+  while (c.alive && c.port.readable){
+    c.reader=c.port.readable.getReader();
+    try{
+      for(;;){
+        const {value,done}=await c.reader.read(); if(done) break;
+        c.rx+=value.length;
+        acc+=dec.decode(value,{stream:true});
+        if (acc.length>4096 && acc.indexOf("\n")<0) acc="";   // 改行の来ないゴミを溜めない
+        let i; while((i=acc.indexOf("\n"))>=0){ serialLine(c,acc.slice(0,i).trim()); acc=acc.slice(i+1); }
+      }
+    }catch(e){ if (c.alive) log("シリアル読み取りエラー: "+(e.name||e)+"(再試行)","err"); }
+    finally{ try{ c.reader.releaseLock(); }catch{} c.reader=null; }
+    if (!c.alive) return;
+    await sleep(50);
+  }
+  if (c.alive && serialConn===c){          // 致命的(USBが抜けた等)
+    c.alive=false; clearTimeout(c.watch);
+    await serialRelease(c); serialConn=null;
+    banner("シリアルポートが切断されました");
+    handle({type:"status",connected:false,kind:null});
+  }
 }
 function serialLine(c,line){
   if(!line) return;
   const pm=/^#(\d+) (.*)$/.exec(line);   // "#<id> ..." は対象ID以外を捨てる
-  if (pm){ if (+pm[1]!==c.id) return; line=pm[2]; }
+  if (pm){ if (c.id<0){ c.seen.add(+pm[1]); return; } if (+pm[1]!==c.id) return; line=pm[2]; }
   if (line.startsWith("RESET ")){ handle({type:"reset",status:line==="RESET OK"?1:line.includes("BUSY")?2:0}); return; }
   if (line==="SAVED"||line.startsWith("SAVE ")){ handle({type:"saved",status:line==="SAVED"?1:line.includes("BUSY")?2:0}); return; }
   if (line==="CAPBEGIN"){ c.cap=[]; return; }
@@ -590,12 +672,13 @@ function serialLine(c,line){
   if (c.cap){ const r=line.split(",").map(Number); if(r.length>=5&&r.every(isFinite)) c.cap.push(r); return; }
   const g=GAINRE.exec(line); if (g){ handle({type:"gain",name:g[1],value:+g[2]}); return; }
   const kv={}; for (const m of line.matchAll(KVRE)) kv[m[1]]=+m[2];
-  if ("v" in kv && "Iq" in kv)
+  if ("v" in kv && "Iq" in kv){
+    c.gotTelem=true;
     handle({type:"telem",t:(performance.now()-c.t0)/1000,v:kv.v,tgt:kv.tgt??0,iq:kv.Iq,id:kv.Id??0,vq:kv.Vq??0,sa:kv.sa??0,trq:kv.trq??0,hz:kv.loopHz??0});
-  else handle({type:"log",dir:"rx",text:line});
+  } else handle({type:"log",dir:"rx",text:line});
 }
 // タブを閉じる時は停止を送る(ベストエフォート。確実ではない)
-addEventListener("pagehide",()=>{ if(serialConn&&serialConn.stop) try{ serialConn.writer.write(new TextEncoder().encode("@"+serialConn.id+" S\n")); }catch{} });
+addEventListener("pagehide",()=>{ if(serialConn&&serialConn.stop&&serialConn.id>=0) try{ serialConn.writer.write(new TextEncoder().encode("@"+serialConn.id+" S\n")); }catch{} });
 if (navigator.serial) navigator.serial.addEventListener("disconnect",()=>serialClose(false));
 
 // ---------------- 高速キャプチャ(UART) ----------------
@@ -637,7 +720,11 @@ function frame(){
   for (const c of charts) if (c.data) c.draw();
   requestAnimationFrame(frame);
 }
-setMode(1); initCharts(); updateNotes(); loadPorts().catch(()=>{}); openWs(); frame();
+// 描画ループを最初に起動し、以降の初期化が失敗してもグラフが止まらないようにする
+frame();
+setMode(1); initCharts(); updateNotes();
+try{ loadPorts().catch(()=>{}); }catch{}
+try{ openWs(); }catch(e){ backend=false; refreshRoute(); }
 </script>
 </body>
 </html>

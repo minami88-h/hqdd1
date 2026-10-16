@@ -1,0 +1,49 @@
+HQDD1 — ライセンス / Licensing
+
+Copyright 2026 minamih (https://github.com/minami88-h)
+
+Required Notice: Copyright 2026 minamih (https://github.com/minami88-h)
+
+このリポジトリは、**非商用であれば自由に使えます。商用利用は、著作権者(上記)以外には許可していません。**
+Free to use for non-commercial purposes. Commercial use by anyone other than
+the copyright holder is not permitted.
+
+------------------------------------------------------------------------
+対象ごとのライセンス / License by component
+------------------------------------------------------------------------
+
+1. ソフトウェア / Software
+     firmware/ (※ firmware/src/can_driver/ を除く), webui/, scripts, .github/
+   → PolyForm Noncommercial License 1.0.0
+     全文: LICENSES/PolyForm-Noncommercial-1.0.0.md
+     https://polyformproject.org/licenses/noncommercial/1.0.0
+
+2. ハードウェア設計と文書 / Hardware designs and documentation
+     hardware/ (回路図・PCB・3Dモデル・製造データ), docs/
+   → Creative Commons Attribution-NonCommercial 4.0 International (CC BY-NC 4.0)
+     全文: LICENSES/CC-BY-NC-4.0.txt
+     https://creativecommons.org/licenses/by-nc/4.0/
+
+3. 第三者のコード / Third-party code
+     firmware/src/can_driver/ — ACANFD_STM32 (MIT License)
+     同ディレクトリの LICENSE-ACANFD_STM32 に従います。このリポジトリのライセンスは
+     適用されません。
+     また、ビルド時にダウンロードされる SimpleFOC などのライブラリは、それぞれの
+     ライセンスに従います。
+
+------------------------------------------------------------------------
+日本語の要約(参考)
+------------------------------------------------------------------------
+
+許可すること(非商用):
+  個人利用、趣味、学習、教育、研究、非営利団体での利用。
+  コピー、改変、再配布(同じライセンスと著作権表示を付けること)。
+
+許可しないこと:
+  著作権者以外による商用利用。たとえば、このリポジトリのソフトウェアや設計を
+  使った製品の販売、業務での有償利用、有償サービスへの組み込みなど。
+  商用利用を希望する場合は、著作権者(GitHub: minami88-h)に連絡して別途許諾を得てください。
+
+※ 著作権者自身は、自分の著作物を商用を含めて自由に利用できます。
+※ この要約は参考です。法的な効力があるのは、LICENSES/ 内の英語の全文です。
+※ これらは「オープンソース」(OSI の定義)のライセンスではありません。
