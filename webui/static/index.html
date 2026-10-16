@@ -138,9 +138,9 @@ button.danger{border-color:var(--bad);color:var(--bad)}button.danger:hover{backg
     <h2>制限・システム設定 <span style="font-weight:400">(PIDとは別の値)</span></h2>
     <div id="limits"></div>
     <div class="row">
-      <label>電源電圧プリセット</label>
-      <button data-sv="8" title="2セルLiPo: 公称7.4V、満充電8.4V">2S (8V)</button>
-      <button data-sv="12" title="3セルLiPo: 公称11.1V、満充電12.6V">3S (12V)</button>
+      <label>LiPo電源電圧</label>
+      <button data-sv="8" title="LiPoバッテリー2セル直列: 公称7.4V、満充電8.4V">2セル(2S) 8V</button>
+      <button data-sv="12" title="LiPoバッテリー3セル直列: 公称11.1V、満充電12.6V">3セル(3S) 12V</button>
     </div>
     <div class="warn" id="lnote"></div>
   </div>
@@ -483,7 +483,7 @@ const PARAMS = [
   {l:"電流上限",pre:"PIL",q:"IL",g:"l",u:"A",lo:0.05,hi:5,note:"モーター電流の上限(トルク指令・速度PIDの出力を制限)"},
   {l:"速度上限",pre:"PVL",q:"VL",g:"l",u:"rad/s",lo:1,hi:300,note:"モーター軸基準。出力軸では"},
   {l:"電圧上限",pre:"PUL",q:"UL",g:"l",u:"V",lo:0.5,hi:17,note:"電流PIDの出力上限。電源電圧を超えない"},
-  {l:"電源電圧",pre:"PSV",q:"SV",g:"l",u:"V",lo:5,hi:17,note:"バッテリーに合わせる(測定回路が無いので手動)。2S=8 / 3S=12"},
+  {l:"電源電圧",pre:"PSV",q:"SV",g:"l",u:"V",lo:5,hi:17,note:"LiPoバッテリーに合わせる(測定回路が無いので手動)。2セル(2S)=8 / 3セル(3S)=12"},
   {l:"減速比",pre:"PGR",q:"GR",g:"l",lo:0.1,hi:1000,note:"表示・指令の換算のみ。変更後は位置の意味が変わる"},
   {l:"整列電圧",pre:"PAV",q:"AV",g:"l",u:"V",lo:0.5,hi:12,note:"起動時の電気角合わせ。次回起動から有効"},
 ];

@@ -121,7 +121,7 @@ static void syncD() {
 }
 // 制限値・電源電圧をモーター/ドライバへ反映(いつ呼んでも安全)。
 // 電源電圧が変わるとPWMのデューティ換算(V→duty)が変わる。電圧[V]で指令する電流PIDは
-// 電源電圧を正しく設定すれば、ゲインを変えずに2S/3Sどちらでも同じ特性になる。
+// 電源電圧を正しく設定すれば、ゲインを変えずにLiPo 2セル(2S)/3セル(3S)どちらでも同じ特性になる。
 static void applyParams() {
   driver.voltage_power_supply = g_sv;
   driver.voltage_limit = g_sv;
