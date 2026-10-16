@@ -1,0 +1,38 @@
+{
+  "build": {
+    "core": "stm32",
+    "cpu": "cortex-m4",
+    "extra_flags": "-DSTM32G4xx -DSTM32G431xx -DARDUINO_GENERIC_G431KBUX",
+    "f_cpu": "170000000L",
+    "mcu": "stm32g431kbu6",
+    "product_line": "STM32G431xx",
+    "variant": "STM32G4xx/G431K(6-8-B)(T-U)_G441KB(T-U)"
+  },
+  "connectivity": [
+    "can"
+  ],
+  "debug": {
+    "jlink_device": "STM32G431KB",
+    "openocd_target": "stm32g4x",
+    "svd_path": "STM32G431xx.svd"
+  },
+  "frameworks": [
+    "arduino",
+    "cmsis",
+    "stm32cube"
+  ],
+  "name": "hqdd_1 custom board (STM32G431KBUx, UFQFPN32)",
+  "upload": {
+    "maximum_ram_size": 32768,
+    "maximum_size": 131072,
+    "protocol": "stlink",
+    "protocols": [
+      "stlink",
+      "jlink",
+      "cmsis-dap",
+      "blackmagic"
+    ]
+  },
+  "url": "https://www.st.com/en/microcontrollers-microprocessors/stm32g431kb.html",
+  "vendor": "ST"
+}

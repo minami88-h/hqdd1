@@ -1,0 +1,15 @@
+# PlatformIO / ビルド成果物
+.pio/
+firmware/src/build_id_gen.cpp
+# エディタ・OS
+.vscode/
+.idea/
+*.swp
+.DS_Store
+__pycache__/
+# KiCad のロック・バックアップ・ローカル設定
+*.lck
+*-backups/
+*.kicad_prl
+fp-info-cache
+*.recovered.*

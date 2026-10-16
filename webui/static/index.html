@@ -1,0 +1,643 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HQDD1 コントローラ</title>
+<style>
+:root{--bg:#f4f5f7;--panel:#fff;--fg:#1c2330;--mute:#6b7586;--line:#d9dde4;--acc:#2563eb;--ok:#16a34a;--bad:#dc2626;--grid:#e6e9ee;
+--c1:#2563eb;--c2:#ea580c;--c3:#16a34a;--c4:#9333ea;--c5:#0891b2;--c6:#db2777;--c7:#a16207;--c8:#64748b}
+@media (prefers-color-scheme:dark){:root{--bg:#10141b;--panel:#171c26;--fg:#e4e8ef;--mute:#8d97a8;--line:#2a3140;--acc:#5b8def;--grid:#222937;
+--c1:#6ea0ff;--c2:#ff9650;--c3:#4ade80;--c4:#c084fc;--c5:#22d3ee;--c6:#f472b6;--c7:#facc15;--c8:#94a3b8}}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--fg);font:14px/1.45 system-ui,sans-serif;display:flex;flex-direction:column;height:100vh;overflow:hidden}
+header{display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center;padding:10px 16px;background:var(--panel);border-bottom:1px solid var(--line)}
+h1{font-size:16px;margin:0 8px 0 0}
+label{color:var(--mute);font-size:12px;display:inline-flex;align-items:center;gap:4px}
+input,select,button{font:inherit;color:var(--fg);background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:5px 8px}
+input[type=number]{width:84px}input[type=text]{width:100%}
+button{cursor:pointer}button:hover{border-color:var(--acc)}
+button.pri{background:var(--acc);border-color:var(--acc);color:#fff}
+button.on{background:var(--acc);color:#fff;border-color:var(--acc)}
+#stop{background:var(--bad);border-color:var(--bad);color:#fff;font-size:18px;font-weight:700;padding:12px;width:100%}
+main{display:grid;grid-template-columns:360px minmax(0,1fr);grid-template-rows:minmax(0,1fr);gap:12px;padding:12px;flex:1;min-height:0}
+/* 左の操作列とグラフ列は独立してスクロールする(ゲイン調整中もグラフが見える) */
+main>aside{overflow-y:auto;min-height:0;padding-right:4px}
+main>section{display:flex;flex-direction:column;min-height:0}
+main>section>.card{flex:none}
+@media(max-width:900px){body{height:auto;overflow:auto}main{display:block}main>aside{overflow:visible}.charts{min-height:70vh}}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px;margin-bottom:12px}
+.card h2{font-size:13px;margin:0 0 8px;color:var(--mute);font-weight:600}
+.row{display:flex;gap:6px;align-items:center;margin:6px 0;flex-wrap:wrap}
+.row>.grow{flex:1}
+.seg{display:flex;gap:4px}.seg button{flex:1}
+input[type=range]{width:100%;padding:0}
+#dot{width:10px;height:10px;border-radius:50%;background:var(--bad);display:inline-block}
+#dot.ok{background:var(--ok)}
+.hide{display:none!important}
+.gain{display:grid;grid-template-columns:96px 1fr auto auto;gap:4px;align-items:center;margin:3px 0}
+.gain span{color:var(--mute);font-size:12px}
+#log{height:150px;overflow:auto;font:12px/1.4 ui-monospace,monospace;background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:6px;white-space:pre-wrap}
+.tx{color:var(--acc)}.err{color:var(--bad)}
+.charts{display:flex;flex-direction:column;gap:12px;flex:1;min-height:0;overflow-y:auto}
+.lim{border-color:var(--acc)}.lim h2{color:var(--acc)}
+button.danger{border-color:var(--bad);color:var(--bad)}button.danger:hover{background:var(--bad);color:#fff}
+.gain small{grid-column:2/-1;color:var(--mute);font-size:11px;margin-bottom:4px}
+.chart{margin:0;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:8px 10px;flex:1 1 0;min-height:260px;display:flex;flex-direction:column}
+.chart .hd{display:flex;gap:12px;align-items:baseline;flex-wrap:wrap;font-size:12px;color:var(--mute)}
+.chart .hd b{color:var(--fg);font-size:13px}
+.chart .cvw{flex:1;min-height:0;position:relative;margin-top:6px}
+.chart canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
+.chart .top{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.chart .top .sp{flex:1}
+.chip{display:inline-flex;gap:4px;align-items:center;padding:2px 8px;border:1px solid var(--line);border-radius:999px;font-size:12px;color:var(--mute);cursor:pointer;background:var(--bg)}
+.chip i{width:10px;height:3px;display:inline-block;background:var(--mute)}
+.chip.act{color:var(--fg);border-color:currentColor;background:var(--panel)}
+.chip.dis{display:none}
+.chart .yr input{width:64px;padding:2px 4px}
+.chart select{padding:2px 4px}
+.lg{display:inline-flex;align-items:center;gap:4px}.lg i{width:10px;height:3px;display:inline-block}
+.val{font-variant-numeric:tabular-nums}
+.warn{color:var(--bad);font-size:12px}
+.gain input.got{outline:2px solid var(--ok)}
+</style>
+</head>
+<body>
+<header>
+  <h1>HQDD1 コントローラ</h1>
+  <span class="seg" id="linkmode">
+    <button data-m="can" class="on">CAN</button><button data-m="uart">UART</button>
+  </span>
+  <label>ID <select id="devid"><option value="-1">自動</option><option>0</option><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option><option>7</option></select></label>
+  <span id="canopts">
+    <label>I/F <select id="iface"></select></label>
+  </span>
+  <span id="uartopts" class="hide">
+    <label>経路 <select id="route"><option value="server">サーバ経由</option><option value="web">ブラウザ直結(Web Serial)</option></select></label>
+    <label id="portlbl">ポート <select id="port"></select></label>
+    <label>baud <input type="number" id="baud" value="115200" style="width:90px"></label>
+  </span>
+  <button id="reload" title="ポート一覧を更新">↻</button>
+  <label><input type="checkbox" id="stoponclose" checked>ブラウザを閉じたら停止</label>
+  <button class="pri" id="conn">接続</button>
+  <span id="hint" class="warn hide">サーバ無しモード: UART(Web Serial)のみ。CANは server.py をローカルで起動してください</span>
+  <span><span id="dot"></span> <span id="stat">未接続</span> <span id="rate" class="val" style="color:var(--mute)"></span></span>
+</header>
+
+<main>
+<aside>
+  <div class="card">
+    <button id="stop">■ 停止 (S)</button>
+    <button id="stopall" class="hide" style="margin-top:8px;width:100%">■ 全台停止 (UARTバス全体 @*)</button>
+  </div>
+
+  <div class="card">
+    <h2>運転</h2>
+    <div class="row">
+      <label>モータ</label>
+      <div class="seg grow"><button id="en1">Enable</button><button id="en0">Disable</button></div>
+    </div>
+    <div class="row"><label>モード</label></div>
+    <div class="seg" id="modes">
+      <button data-c="0">トルク</button><button data-c="1">速度</button><button data-c="2">位置</button>
+    </div>
+    <div class="row"><label id="tlabel">目標</label>
+      <span class="grow"></span><span class="val" id="tunit" style="color:var(--mute)"></span></div>
+    <input type="range" id="slider" step="any">
+    <div class="row">
+      <input type="number" id="tnum" step="any" class="grow" value="0">
+      <button class="pri" id="tsend">送信</button>
+      <button id="tzero">0</button>
+    </div>
+    <div class="row">
+      <label>範囲 ±<input type="number" id="tlim" step="any" value="5" style="width:70px"></label>
+      <label><input type="checkbox" id="live">スライダーで即送信</label>
+    </div>
+    <div id="poscard" class="hide">
+      <div class="row">
+        <button data-j="-0.5">−0.5</button><button data-j="-0.1">−0.1</button>
+        <button data-j="0.1">+0.1</button><button data-j="0.5">+0.5</button>
+        <span style="color:var(--mute);font-size:12px">rad 現在の目標から</span>
+      </div>
+      <div class="row">
+        <button id="syncpos" title="スライダー/入力欄を現在位置に合わせる(送信はしない)">現在位置に合わせる</button>
+        <button id="zeropos" title="今の位置を0 radとして再定義(Zコマンド)">現在位置を0にリセット</button>
+      </div>
+    </div>
+    <div class="warn" id="tnote"></div>
+  </div>
+
+  <div class="card">
+    <h2>PIDゲイン (速度・位置・電流)</h2>
+    <div id="gains"></div>
+    <div class="warn" id="gnote"></div>
+  </div>
+
+  <div class="card lim">
+    <h2>制限・システム設定 <span style="font-weight:400">(PIDとは別の値)</span></h2>
+    <div id="limits"></div>
+    <div class="row">
+      <label>電源電圧プリセット</label>
+      <button data-sv="8" title="2セルLiPo: 公称7.4V、満充電8.4V">2S (8V)</button>
+      <button data-sv="12" title="3セルLiPo: 公称11.1V、満充電12.6V">3S (12V)</button>
+    </div>
+    <div class="warn" id="lnote"></div>
+  </div>
+
+  <div class="card">
+    <h2>設定の保存・初期化 (PID・制限・減速比 すべて)</h2>
+    <div class="row">
+      <button id="gall" title="基板の現在値を全項目に読み込む">全て読込</button>
+      <button id="gsave" class="pri" title="基板のフラッシュに保存。電源を切っても残る(プログラムを書き込み直すとコードの値に戻る)。停止中に押す">フラッシュに保存</button>
+      <span id="gdirty" class="val" style="font-size:12px"></span>
+    </div>
+    <div class="row">
+      <button id="gfactory" class="danger" title="コードに書かれた初期値に戻し、保存内容も消す">出荷状態に戻す</button>
+      <span style="color:var(--mute);font-size:12px">基板に書き込んだコードの値</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>生コマンド / ログ</h2>
+    <div class="row"><input type="text" id="raw" placeholder="例: MC1  MVP0.02  PIL1.5  ME1  (Enterで送信)"></div>
+    <div id="log"></div>
+    <div class="row">
+      <button id="cap" title="UART接続時のみ。1kHz×600点を基板が溜めて送る">高速キャプチャ(L)</button>
+      <button id="clog">ログ消去</button>
+    </div>
+  </div>
+</aside>
+
+<section>
+  <div class="card" style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:12px">
+    <label>表示幅 <select id="win"><option value="1">1秒</option><option value="2">2秒</option><option value="5">5秒</option><option value="10" selected>10秒</option><option value="30">30秒</option><option value="60">1分</option><option value="120">2分</option><option value="300">5分</option></select></label>
+    <select id="addpreset">
+      <option value="follow">モード連動(実値＋目標)</option><option value="v">速度</option><option value="a">位置</option>
+      <option value="i">電流 Iq/Id</option><option value="vt">Vq / トルク</option><option value="">空のグラフ</option>
+    </select><button class="pri" id="addchart">＋ グラフ追加</button>
+    <button id="pause">一時停止</button>
+    <button id="clear">クリア</button>
+    <button id="csv">CSV保存</button>
+    <span style="color:var(--mute);font-size:12px">CANは周期20ms、UARTは200msで更新されます。</span>
+  </div>
+  <div class="charts" id="charts"></div>
+</section>
+</main>
+
+<script>
+"use strict";
+const $ = id => document.getElementById(id);
+
+// ---------------- チャート ----------------
+const COL = ["--c1","--c2","--c3","--c4","--c5","--c6","--c7","--c8"];
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+// 表示できる項目: key -> [名前, 単位, 色番号, 破線]。tgt_*は現在のモードに合う時だけ値を持つ。
+const SER = {
+  v:["実速度","rad/s",0], tgt_v:["目標(速度)","rad/s",1,1],
+  sa:["実角度","rad",2], tgt_a:["目標(位置)","rad",1,1],
+  iq:["Iq","A",3], id:["Id","A",4], tgt_i:["目標(トルク→Iq換算)","A",1,1],
+  vq:["Vq","V",5], trq:["トルク","Nm",6], tgt:["目標(生値)","",7,1],
+};
+// モード連動: モードに応じて「実値＋目標」を自動で切り替える
+const FOLLOW = {0:["iq","tgt_i"],1:["v","tgt_v"],2:["sa","tgt_a"],null:["v","tgt"]};
+const PRESETS = {follow:[], v:["v","tgt_v"], a:["sa","tgt_a"], i:["iq","id","tgt_i"], vt:["vq","trq"], "":[]};
+const MODE_NAME = {0:"トルク",1:"速度",2:"位置"};
+
+class Chart {
+  // cfg: {keys:[], follow:bool, auto:bool, min, max, h}。data指定時は静的(キャプチャ用)。
+  constructor(cfg, data){
+    this.cfg = Object.assign({keys:[],follow:false,auto:true,min:-1,max:1,h:320}, cfg);
+    this.data = data || null;
+    const box = this.box = document.createElement("div"); box.className = "chart";
+    const top = document.createElement("div"); top.className = "top";
+    this.title = document.createElement("b"); this.title.textContent = this.cfg.title || "グラフ";
+    top.append(this.title);
+    this.chips = {};
+    const keys = this.data ? this.cfg.keys : Object.keys(SER);
+    for (const k of keys){
+      const [lab,unit,ci] = SER[k];
+      const c = document.createElement("span"); c.className = "chip";
+      c.innerHTML = `<i style="background:var(${COL[ci]})"></i>${lab}<span class="val"></span>`;
+      c.title = unit; c.onclick = () => this.toggle(k);
+      this.chips[k] = c; top.append(c);
+    }
+    const sp = document.createElement("span"); sp.className = "sp"; top.append(sp);
+    // 縦軸: 自動 or 固定
+    const yr = document.createElement("span"); yr.className = "yr";
+    yr.innerHTML = `<label>縦軸 <select><option value="a">自動</option><option value="f">固定</option></select></label>
+      <label class="ym hide"><input type="number" step="any"> ～ <input type="number" step="any"></label>`;
+    const sel = yr.querySelector("select"), ym = yr.querySelector(".ym"), [i0,i1] = ym.querySelectorAll("input");
+    sel.value = this.cfg.auto ? "a" : "f"; i0.value = this.cfg.min; i1.value = this.cfg.max;
+    ym.classList.toggle("hide", this.cfg.auto);
+    sel.onchange = () => { this.cfg.auto = sel.value==="a"; ym.classList.toggle("hide", this.cfg.auto); saveCharts(); };
+    i0.onchange = i1.onchange = () => { this.cfg.min = +i0.value; this.cfg.max = +i1.value; saveCharts(); };
+    top.append(yr);
+    const x = document.createElement("button"); x.textContent = "×"; x.title = "このグラフを削除";
+    x.onclick = () => { this.box.remove(); charts.splice(charts.indexOf(this),1); saveCharts(); };
+    top.append(x);
+    this.cvw = document.createElement("div"); this.cvw.className = "cvw"; this.cvw.style.height = this.cfg.h + "px";
+    this.cv = document.createElement("canvas"); this.cvw.append(this.cv);
+    this.cvw.addEventListener("mouseup", () => { this.cfg.h = this.cvw.clientHeight; saveCharts(); });
+    box.append(top, this.cvw);
+    this.refreshChips();
+  }
+  activeKeys(){ return this.cfg.follow ? FOLLOW[mode] || FOLLOW[null] : this.cfg.keys; }
+  toggle(k){
+    if (this.cfg.follow){ this.cfg.follow = false; this.cfg.keys = this.activeKeys().slice(); }   // 手で触ったら連動を解除
+    const i = this.cfg.keys.indexOf(k); i<0 ? this.cfg.keys.push(k) : this.cfg.keys.splice(i,1);
+    this.refreshChips(); saveCharts();
+  }
+  refreshChips(){
+    const act = this.activeKeys();
+    for (const k in this.chips) this.chips[k].classList.toggle("act", act.includes(k));
+    this.title.textContent = this.cfg.title || (this.cfg.follow ? `モード連動 (${MODE_NAME[mode] ?? "?"})` : "グラフ");
+  }
+  draw(buf0, t1, win){
+    const buf = this.data || buf0;
+    if (this.data){ t1 = buf.length ? buf[buf.length-1].t : 0; win = t1 || 1; }
+    const keys = this.activeKeys();
+    if (this.cfg.follow && this._m !== mode){ this._m = mode; this.refreshChips(); }
+    const cv = this.cv, r = devicePixelRatio || 1;
+    const W = cv.clientWidth, H = cv.clientHeight;
+    if (!W || !H) return;
+    if (cv.width !== Math.round(W*r) || cv.height !== Math.round(H*r)){ cv.width = Math.round(W*r); cv.height = Math.round(H*r); }
+    const g = cv.getContext("2d"); g.setTransform(r,0,0,r,0,0); g.clearRect(0,0,W,H);
+    const L=52,R=8,T=6,B=18, pw=W-L-R, ph=H-T-B, t0=t1-win;
+    // 長い履歴でも軽いように、表示範囲の先頭を二分探索し、点が多い時は間引く
+    let i0=0;
+    { let a=0, b=buf.length; while(a<b){ const m=(a+b)>>1; if (buf[m].t < t0-1) a=m+1; else b=m; } i0=a; }
+    const stride=Math.max(1, Math.floor((buf.length-i0)/(pw*2)));
+    let lo=Infinity, hi=-Infinity;
+    if (this.cfg.auto){
+      for (const k of keys) for (let i=buf.length-1;i>=i0;i-=stride){
+        const p=buf[i]; if (p.t<t0) break; const v=p[k]; if (v==null) continue;
+        if (v<lo) lo=v; if (v>hi) hi=v;
+      }
+      if (!isFinite(lo)){ lo=-1; hi=1; }
+      if (hi-lo<1e-6){ lo-=0.5; hi+=0.5; }
+      const pad=(hi-lo)*0.08; lo-=pad; hi+=pad;
+    } else { lo=Math.min(this.cfg.min,this.cfg.max); hi=Math.max(this.cfg.min,this.cfg.max); if (hi-lo<1e-9) hi=lo+1; }
+    const X=t=>L+(t-t0)/win*pw, Y=v=>T+(1-(v-lo)/(hi-lo))*ph;
+    g.font="11px system-ui"; g.fillStyle=css("--mute"); g.strokeStyle=css("--grid"); g.lineWidth=1;
+    const rows = Math.max(4, Math.min(10, Math.floor(ph/36)));
+    for (let i=0;i<=rows;i++){
+      const v=lo+(hi-lo)*i/rows, y=Y(v);
+      g.beginPath(); g.moveTo(L,y); g.lineTo(W-R,y); g.stroke();
+      g.textAlign="right"; g.fillText(v.toFixed(Math.abs(hi-lo)<2?3:Math.abs(hi-lo)<20?2:1),L-4,y+3);
+    }
+    g.textAlign="center";
+    for (let i=0;i<=4;i++){ const t=t0+win*i/4; const d=t-t1; g.fillText(this.data?d.toFixed(2)+"s":win>=120?(d/60).toFixed(1)+"分":d.toFixed(0)+"s",X(t),H-4); }
+    if (lo<0 && hi>0){ g.strokeStyle=css("--mute"); g.beginPath(); g.moveTo(L,Y(0)); g.lineTo(W-R,Y(0)); g.stroke(); }
+    g.save(); g.beginPath(); g.rect(L,T,pw,ph); g.clip();
+    for (const k of keys){
+      const sd=SER[k]; if(!sd) continue;
+      g.strokeStyle=css(COL[sd[2]]); g.lineWidth=1.8; g.setLineDash(sd[3]?[6,4]:[]);
+      g.beginPath(); let first=true;
+      for (let i=i0;i<buf.length;i+=stride){
+        const p=buf[i]; const v=p[k]; if (v==null){ first=true; continue; }
+        first ? g.moveTo(X(p.t),Y(v)) : g.lineTo(X(p.t),Y(v)); first=false;
+      }
+      const pl=buf[buf.length-1]; if (pl && pl[k]!=null && stride>1) g.lineTo(X(pl.t),Y(pl[k]));
+      g.stroke();
+    }
+    g.restore();
+    const last = buf[buf.length-1];
+    for (const k in this.chips){
+      const e=this.chips[k].lastChild, on=keys.includes(k);
+      e.textContent = on && last && last[k]!=null ? " "+last[k].toFixed(3) : "";
+    }
+  }
+}
+let charts = [];
+function saveCharts(){
+  try{ localStorage.setItem("hqdd1_charts", JSON.stringify(charts.filter(c=>!c.data).map(c=>c.cfg))); }catch{}
+}
+function addChart(cfg, data){
+  const c = new Chart(cfg, data); charts.push(c);
+  if (data) $("charts").prepend(c.box); else $("charts").append(c.box);
+  return c;
+}
+function addPreset(p){
+  if (p==="follow") addChart({follow:true});
+  else addChart({keys:PRESETS[p].slice(), title:{v:"速度",a:"位置",i:"電流",vt:"Vq / トルク"}[p]});
+  saveCharts();
+}
+function initCharts(){
+  let saved=null; try{ saved=JSON.parse(localStorage.getItem("hqdd1_charts")||"null"); }catch{}
+  if (Array.isArray(saved) && saved.length) saved.forEach(c=>addChart(c)); else addChart({follow:true});
+}
+$("addchart").onclick=()=>addPreset($("addpreset").value);
+
+// ---------------- 状態 ----------------
+let routeTouched=false, gearRatio=null, dirty=false, ws, backend=false, serialConn=null, autoRead=false, connected=false, linkMode="can", buf=[], paused=false, nrx=0, lastRx=0, mode=null;
+const MAXBUF = 20000;   // 表示幅の最大5分(50Hzで15000点)+余裕。UART(5Hz)なら約1時間分
+
+function log(text, cls){
+  const d=document.createElement("div"); if(cls) d.className=cls; d.textContent=text;
+  const L=$("log"); L.append(d); while(L.childElementCount>300) L.firstChild.remove(); L.scrollTop=L.scrollHeight;
+}
+function useWebSerial(){ return linkMode==="uart" && $("route").value==="web"; }
+function send(o){
+  if (serialConn || (useWebSerial() && o.type==="connect")){ serialOp(o); return; }
+  if (ws && ws.readyState===1) ws.send(JSON.stringify(o));
+}
+function cmd(text, all){
+  if (!connected){ log("未接続です","err"); return; }
+  if (linkMode==="can" && text.length>8){ log(`CANは8文字まで: ${text}`,"err"); return; }
+  send({type:"cmd",text,all:!!all});
+}
+
+function openWs(){
+  ws = new WebSocket(`ws://${location.host}/ws`);
+  ws.onopen = () => { backend=true; refreshRoute(); loadPorts().catch(()=>{}); };
+  ws.onmessage = e => handle(JSON.parse(e.data));
+  ws.onclose = () => { if (!backend) refreshRoute(); if (backend){ backend=false; if(!serialConn){ connected=false; $("dot").className=""; $("stat").textContent="サーバ切断"; } refreshRoute(); } setTimeout(openWs,3000); };
+}
+// 目標値はモードごとに単位が違うので、モードに合う系列にだけ値を入れる
+function derive(m){
+  const t=m.tgt;
+  m.tgt_v = mode===1 ? t : null;
+  m.tgt_a = mode===2 ? t : null;
+  m.tgt_i = mode===0 && gearRatio ? t/gearRatio : null;
+}
+function handle(m){
+    if (m.type==="telem"){
+      if (paused) return;
+      derive(m);
+      buf.push(m); if (buf.length>MAXBUF+2000) buf.splice(0,buf.length-MAXBUF);
+      nrx++; lastRx=performance.now();
+      if (autoRead){ autoRead=false; readAll(); }
+    } else if (m.type==="gain"){ gotGain(m.name,m.value); }
+    else if (m.type==="reset"){
+      log(["初期化に失敗","出荷状態に戻しました","回転中のため拒否(停止してから)"][m.status], m.status===1?"":"err");
+      if (m.status===1){ setDirty(false); setTimeout(readAll,200); }
+    }
+    else if (m.type==="saved"){
+      const r=["保存に失敗","保存しました","回転中のため保存を拒否(停止してから)"][m.status];
+      log(r, m.status===1?"":"err"); if (m.status===1) setDirty(false);
+    }
+    else if (m.type==="status"){
+      connected=m.connected; $("dot").className=connected?"ok":"";
+      $("stat").textContent=connected?`接続中 (${m.kind.toUpperCase()})`:"未接続";
+      $("conn").textContent=connected?"切断":"接続";
+      if (connected) autoRead=true;
+    } else if (m.type==="log"){ log((m.dir==="tx"?"> ":"")+m.text, m.dir==="tx"?"tx":""); }
+    else if (m.type==="devid"){ $("devid").value=m.id; }
+    else if (m.type==="error"){ log(m.text,"err"); }
+    else if (m.type==="capture"){ showCapture(m.rows); }
+}
+
+// ---------------- 接続 ----------------
+async function loadPorts(){
+  if (!backend && !ws) return;
+  const r = await (await fetch("/api/ports")).json();
+  const fill=(el,list)=>{ const cur=el.value; el.innerHTML=list.map(x=>`<option>${x}</option>`).join(""); if(list.includes(cur)) el.value=cur; };
+  fill($("iface"), r.can.length?r.can:["can0"]); fill($("port"), r.serial);
+}
+$("reload").onclick=loadPorts;
+document.querySelectorAll("#linkmode button").forEach(b=>b.onclick=()=>{
+  linkMode=b.dataset.m;
+  document.querySelectorAll("#linkmode button").forEach(x=>x.classList.toggle("on",x===b));
+  $("canopts").classList.toggle("hide",linkMode!=="can"); $("uartopts").classList.toggle("hide",linkMode!=="uart");
+  $("stopall").classList.toggle("hide",linkMode!=="uart");
+  $("devid").querySelector('[value="-1"]').disabled = linkMode==="uart";
+  if (linkMode==="uart" && $("devid").value==="-1") $("devid").value="1";
+  updateNotes();
+});
+function refreshRoute(){
+  const web=!!navigator.serial, r=$("route");
+  r.querySelector('[value=web]').disabled=!web; r.querySelector('[value=server]').disabled=!backend;
+  if (!backend && web) r.value="web"; else if (backend && (!web || !routeTouched)) r.value="server";
+  $("hint").classList.toggle("hide", backend);
+  const canBtn=document.querySelector('#linkmode [data-m=can]');
+  canBtn.disabled=!backend; canBtn.title=backend?"":"CANはサーバ(server.py)経由でのみ使えます";
+  if (!backend && linkMode==="can") document.querySelector('#linkmode [data-m=uart]').click();
+  $("portlbl").classList.toggle("hide", r.value==="web");
+  if (!backend && !web) $("stat").textContent="サーバ未接続 / このブラウザはWeb Serial非対応(Chrome/Edgeを使用)";
+}
+$("route").onchange=()=>{ routeTouched=true; refreshRoute(); };
+$("conn").onclick=()=>{
+  if (connected){ send({type:"disconnect"}); return; }
+  const stop_on_close=$("stoponclose").checked, dev_id=+$("devid").value;
+  if (linkMode==="uart" && dev_id<0){ log("UARTではIDを指定してください(同じバスの複数台を区別するため)","err"); return; }
+  send(linkMode==="can"
+    ? {type:"connect",mode:"can",iface:$("iface").value,dev_id,stop_on_close}
+    : {type:"connect",mode:"uart",port:$("port").value,baud:+$("baud").value,dev_id,stop_on_close});
+};
+
+// ---------------- 運転 ----------------
+const UNITS = {0:["トルク指令","出力換算電流 (A×減速比)"],1:["速度指令","rad/s (出力軸)"],2:["位置指令","rad (出力軸)"]};
+const DEF_LIM = {0:5,1:5,2:12.57};
+function setMode(c){
+  mode=c;
+  document.querySelectorAll("#modes button").forEach(b=>b.classList.toggle("on",+b.dataset.c===c));
+  $("tlabel").textContent=UNITS[c][0]; $("tunit").textContent=UNITS[c][1];
+  $("tlim").value=DEF_LIM[c]; applyLim();
+  $("poscard").classList.toggle("hide",c!==2);
+  $("tnote").textContent=c===2?"位置モード: 入った時の目標は現在位置です。送信するまで動きません。":"";
+}
+function applyLim(){ const l=Math.abs(+$("tlim").value)||1; $("slider").min=-l; $("slider").max=l; }
+function clampT(v){ const l=Math.abs(+$("tlim").value); return Math.max(-l,Math.min(l,v)); }
+function sendTarget(v){
+  v=clampT(v); $("tnum").value=v; $("slider").value=v;
+  cmd("M"+(+v.toFixed(3)));
+}
+document.querySelectorAll("#modes button").forEach(b=>b.onclick=()=>{
+  // MCだけ送る。基板側が切替と同時に目標を「位置=現在位置 / その他=0」にするので、
+  // 直後に目標値は送らない(位置モードで0位置へ飛ぶのを防ぐ)。
+  const c=+b.dataset.c; cmd("MC"+c); setMode(c);
+  if (c===2) syncPos(); else { $("tnum").value=0; $("slider").value=0; }
+});
+function curAngle(){ const p=buf[buf.length-1]; return p?p.sa:0; }
+function syncPos(){
+  const a=+curAngle().toFixed(3), l=Math.max(Math.abs(+$("tlim").value),Math.abs(a)+1);
+  $("tlim").value=+l.toFixed(2); applyLim();
+  $("tnum").value=a; $("slider").value=a;
+}
+$("syncpos").onclick=syncPos;
+$("zeropos").onclick=()=>{ cmd("Z"); $("tnum").value=0; $("slider").value=0; log("現在位置を0にリセット"); };
+document.querySelectorAll("#poscard [data-j]").forEach(b=>b.onclick=()=>sendTarget((+$("tnum").value||0)+(+b.dataset.j)));
+$("stopall").onclick=()=>{ cmd("S",true); $("tnum").value=0; $("slider").value=0; setMode(1); };
+$("en1").onclick=()=>cmd("ME1"); $("en0").onclick=()=>cmd("ME0");
+$("stop").onclick=()=>{ cmd("S"); $("tnum").value=0; $("slider").value=0; setMode(1); };
+$("tsend").onclick=()=>sendTarget(+$("tnum").value);
+$("tnum").onkeydown=e=>{ if(e.key==="Enter") sendTarget(+$("tnum").value); };
+$("tzero").onclick=()=>sendTarget(0);
+$("tlim").onchange=applyLim;
+let lastLive=0;
+$("slider").oninput=e=>{
+  $("tnum").value=e.target.value;
+  if ($("live").checked && performance.now()-lastLive>60){ lastLive=performance.now(); sendTarget(+e.target.value); }
+};
+$("slider").onchange=e=>sendTarget(+e.target.value);
+document.addEventListener("keydown",e=>{ if (e.key==="Escape") $("stop").click(); });
+
+// ---------------- ゲイン ----------------
+// {l:表示名, pre:設定コマンドの接頭辞, q:問い合わせ名, u:単位, g:所属(g=PID/l=制限・システム), lo/hi:入力範囲, note:補足}
+// 設定は pre+値 (例 "MVP0.02", "PIL1.5")、読み出しは "?"+q。範囲は基板側でも検証される。
+const PARAMS = [
+  {l:"速度 P",pre:"MVP",q:"VP",g:"g"},{l:"速度 I",pre:"MVI",q:"VI",g:"g"},{l:"速度 D",pre:"MVD",q:"VD",g:"g"},
+  {l:"速度 LPF",pre:"MVF",q:"VF",g:"g",u:"s"},{l:"位置 P",pre:"MAP",q:"AP",g:"g"},
+  {l:"電流 P",pre:"MQP",q:"QP",g:"g",note:"q軸・d軸共通"},{l:"電流 I",pre:"MQI",q:"QI",g:"g",note:"q軸・d軸共通"},
+  {l:"電流上限",pre:"PIL",q:"IL",g:"l",u:"A",lo:0.05,hi:5,note:"モーター電流の上限(トルク指令・速度PIDの出力を制限)"},
+  {l:"速度上限",pre:"PVL",q:"VL",g:"l",u:"rad/s",lo:1,hi:300,note:"モーター軸基準。出力軸では"},
+  {l:"電圧上限",pre:"PUL",q:"UL",g:"l",u:"V",lo:0.5,hi:17,note:"電流PIDの出力上限。電源電圧を超えない"},
+  {l:"電源電圧",pre:"PSV",q:"SV",g:"l",u:"V",lo:5,hi:17,note:"バッテリーに合わせる(測定回路が無いので手動)。2S=8 / 3S=12"},
+  {l:"減速比",pre:"PGR",q:"GR",g:"l",lo:0.1,hi:1000,note:"表示・指令の換算のみ。変更後は位置の意味が変わる"},
+  {l:"整列電圧",pre:"PAV",q:"AV",g:"l",u:"V",lo:0.5,hi:12,note:"起動時の電気角合わせ。次回起動から有効"},
+];
+const rowHtml = (p,i)=>`<div class="gain"><span>${p.l}${p.u?` <i style="font-style:normal">[${p.u}]</i>`:""}</span><input type="number" step="any" id="p_${p.q}"
+  placeholder="${p.pre}"${p.lo!=null?` min="${p.lo}" max="${p.hi}"`:""}>
+  <button data-i="${i}" data-a="set">設定</button><button data-i="${i}" data-a="get" title="この項目の現在値を基板から読む">読</button>
+  ${p.note?`<small>${p.note}<span id="h_${p.q}"></span></small>`:""}</div>`;
+$("gains").innerHTML = PARAMS.map((p,i)=>p.g==="g"?rowHtml(p,i):"").join("");
+$("limits").innerHTML = PARAMS.map((p,i)=>p.g==="l"?rowHtml(p,i):"").join("");
+function setDirty(d){ dirty=d; $("gdirty").textContent=d?"● 未保存の変更あり":""; $("gdirty").style.color=d?"var(--bad)":""; }
+function paramClick(e){
+  const b=e.target.closest("button"); if(!b || b.dataset.i==null) return;
+  const p=PARAMS[+b.dataset.i];
+  if (b.dataset.a==="get") cmd("?"+p.q);
+  else {
+    const v=$("p_"+p.q).value; if (v==="") return;
+    if (p.lo!=null && (+v<p.lo || +v>p.hi)){ log(`${p.l}は ${p.lo}〜${p.hi} の範囲で指定してください`,"err"); return; }
+    cmd(p.pre+v); setDirty(true); setTimeout(()=>cmd("?"+p.q),120);   // 基板側で範囲外なら無視されるので読み戻して確認
+  }
+}
+$("gains").onclick=paramClick; $("limits").onclick=paramClick;
+document.querySelectorAll("[data-sv]").forEach(b=>b.onclick=()=>{ $("p_SV").value=b.dataset.sv; cmd("PSV"+b.dataset.sv); setDirty(true); setTimeout(()=>cmd("?SV"),120); });
+function updateHints(){
+  const vl=+$("p_VL").value, gr=gearRatio;
+  $("h_VL").textContent = vl&&gr ? ` ${(vl/gr).toFixed(2)} rad/s` : "";
+  $("lnote").textContent = linkMode==="can" ? "CANは1コマンド8文字まで。" : "";
+}
+function gotGain(name,v){
+  if (name==="MC"){ const c=Math.round(v); if (c!==mode){ setMode(c); if (c===2) syncPos(); } return; }
+  const e=$("p_"+name); if(!e) return;
+  if (name==="GR") gearRatio=v;
+  e.value=+v.toPrecision(5); e.classList.add("got"); setTimeout(()=>e.classList.remove("got"),800);
+  updateHints();
+}
+function readAll(){
+  ["MC"].concat(PARAMS.map(p=>p.q)).forEach((n,i)=>setTimeout(()=>cmd("?"+n),i*60));
+}
+$("gall").onclick=readAll;
+$("gfactory").onclick=()=>{
+  if (!confirm("すべてのパラメータ(PIDゲイン・制限値・電源電圧・減速比)を出荷状態に戻し、保存済みの内容も消します。\n停止中に実行してください。続けますか?")) return;
+  cmd("F");
+};
+$("gsave").onclick=()=>{
+  if (!confirm("現在のゲイン・減速比をフラッシュに保存します(数十msの間、基板の制御が止まります)。\n停止中に実行してください。続けますか?")) return;
+  cmd("W");
+};
+addEventListener("beforeunload",e=>{ if (dirty){ e.preventDefault(); e.returnValue=""; } });
+$("raw").onkeydown=e=>{ if(e.key==="Enter" && e.target.value){ cmd(e.target.value); e.target.value=""; } };
+$("clog").onclick=()=>$("log").replaceChildren();
+
+function updateNotes(){
+  setTimeout(()=>{ if(typeof updateHints==="function") updateHints(); },0);
+  $("gnote").textContent = linkMode==="can"
+    ? "CANは1コマンド8文字まで(例 MVP0.015)。「設定」は即反映、電源を切っても残すには「フラッシュに保存」。"
+    : "「設定」は即反映、電源を切っても残すには「フラッシュに保存」。コマンドには宛先ID(@id)が付きます。";
+  $("cap").disabled = linkMode!=="uart";
+}
+
+// ---------------- Web Serial 直結(サーバ不要、UARTのみ) ----------------
+const KVRE=/(\w+)=(-?\d+(?:\.\d+)?)/g, GAINRE=/^GAIN (\w\w) (-?[\d.]+(?:e-?\d+)?)$/;
+async function serialOp(o){
+  try{
+    if (o.type==="connect"){
+      const port=await navigator.serial.requestPort();
+      await port.open({baudRate:o.baud});
+      serialConn={port,writer:port.writable.getWriter(),reader:port.readable.getReader(),stop:o.stop_on_close,cap:null,t0:performance.now(),id:o.dev_id};
+      handle({type:"status",connected:true,kind:"uart"});
+      serialRead(serialConn);
+      // 共有バスでテレメトリが衝突しないよう、全台を黙らせてから対象だけ有効にする
+      await serialWrite("@* T0"); await new Promise(r=>setTimeout(r,50)); await serialWrite("@"+o.dev_id+" T1");
+    } else if (o.type==="cmd"){
+      await serialWrite((o.all?"@* ":"@"+serialConn.id+" ")+o.text);
+      handle({type:"log",dir:"tx",text:(o.all?"[全台] ":"")+o.text});
+    } else if (o.type==="disconnect"){ await serialClose(true); }
+  }catch(e){ log(String(e),"err"); if (o.type==="connect") serialConn=null; }
+}
+function serialWrite(line){ return serialConn.writer.write(new TextEncoder().encode(line+"\n")); }
+async function serialClose(sendStop){
+  const c=serialConn; if(!c) return; serialConn=null;
+  try{ if (sendStop) await c.writer.write(new TextEncoder().encode("@"+c.id+" S\n")); }catch{}
+  try{ await c.reader.cancel(); }catch{}
+  try{ c.reader.releaseLock(); c.writer.releaseLock(); await c.port.close(); }catch{}
+  handle({type:"status",connected:false,kind:null});
+}
+async function serialRead(c){
+  const dec=new TextDecoder(); let acc="";
+  try{
+    for(;;){
+      const {value,done}=await c.reader.read(); if(done) break;
+      acc+=dec.decode(value,{stream:true});
+      let i; while((i=acc.indexOf("\n"))>=0){ serialLine(c,acc.slice(0,i).trim()); acc=acc.slice(i+1); }
+    }
+  }catch(e){ if (serialConn===c) log("シリアル切断: "+e,"err"); }
+  if (serialConn===c){ serialConn=null; handle({type:"status",connected:false,kind:null}); }
+}
+function serialLine(c,line){
+  if(!line) return;
+  const pm=/^#(\d+) (.*)$/.exec(line);   // "#<id> ..." は対象ID以外を捨てる
+  if (pm){ if (+pm[1]!==c.id) return; line=pm[2]; }
+  if (line.startsWith("RESET ")){ handle({type:"reset",status:line==="RESET OK"?1:line.includes("BUSY")?2:0}); return; }
+  if (line==="SAVED"||line.startsWith("SAVE ")){ handle({type:"saved",status:line==="SAVED"?1:line.includes("BUSY")?2:0}); return; }
+  if (line==="CAPBEGIN"){ c.cap=[]; return; }
+  if (line==="CAPEND"){ handle({type:"capture",rows:c.cap||[]}); c.cap=null; return; }
+  if (c.cap){ const r=line.split(",").map(Number); if(r.length>=5&&r.every(isFinite)) c.cap.push(r); return; }
+  const g=GAINRE.exec(line); if (g){ handle({type:"gain",name:g[1],value:+g[2]}); return; }
+  const kv={}; for (const m of line.matchAll(KVRE)) kv[m[1]]=+m[2];
+  if ("v" in kv && "Iq" in kv)
+    handle({type:"telem",t:(performance.now()-c.t0)/1000,v:kv.v,tgt:kv.tgt??0,iq:kv.Iq,id:kv.Id??0,vq:kv.Vq??0,sa:kv.sa??0,trq:kv.trq??0,hz:kv.loopHz??0});
+  else handle({type:"log",dir:"rx",text:line});
+}
+// タブを閉じる時は停止を送る(ベストエフォート。確実ではない)
+addEventListener("pagehide",()=>{ if(serialConn&&serialConn.stop) try{ serialConn.writer.write(new TextEncoder().encode("@"+serialConn.id+" S\n")); }catch{} });
+if (navigator.serial) navigator.serial.addEventListener("disconnect",()=>serialClose(false));
+
+// ---------------- 高速キャプチャ(UART) ----------------
+let capChart=null;
+$("cap").onclick=()=>{ cmd("L"); log("キャプチャ中(約0.6秒、その間テレメトリ停止)…"); };
+function showCapture(rows){
+  log(`キャプチャ受信 ${rows.length}点`);
+  if (!rows.length) return;
+  // 列: t[us], v, Iq, Vq, sa  (v,saはモータ軸基準の生値)
+  if (capChart){ capChart.box.remove(); charts.splice(charts.indexOf(capChart),1); }
+  const data=rows.map(r=>({t:r[0]/1e6,v:r[1],iq:r[2],vq:r[3],sa:r[4]}));
+  capChart=addChart({keys:["v","iq","vq"],title:"キャプチャ (1kHz, モータ軸の生値)",auto:true},data);
+  capChart.cfg.keys=["v","iq","vq"]; capChart.refreshChips();
+}
+
+// ---------------- 描画ループ・CSV ----------------
+$("pause").onclick=e=>{ paused=!paused; e.target.textContent=paused?"再開":"一時停止"; e.target.classList.toggle("on",paused); };
+$("clear").onclick=()=>{ buf=[]; };
+$("csv").onclick=()=>{
+  const k=["t","v","tgt","sa","iq","id","vq","trq"];
+  const txt=[k.join(",")].concat(buf.map(p=>k.map(x=>p[x]==null?"":p[x]).join(","))).join("\n");
+  const a=document.createElement("a"); a.href=URL.createObjectURL(new Blob([txt],{type:"text/csv"}));
+  a.download=`hqdd1_${Date.now()}.csv`; a.click();
+};
+let tPrev=performance.now(), nPrev=0;
+setInterval(()=>{
+  const now=performance.now(); $("rate").textContent=connected?`${((nrx-nPrev)*1000/(now-tPrev)).toFixed(0)} Hz`:"";
+  tPrev=now; nPrev=nrx;
+  if (connected && lastRx && now-lastRx>1500 && nrx) $("stat").textContent="接続中 — テレメトリ途絶!";
+},1000);
+let lastDraw=0;
+function frame(){
+  if (!paused && buf.length){
+    const t1=buf[buf.length-1].t, w=+$("win").value, win=w>0?w:Math.max(1,t1-buf[0].t);
+    // 長い表示幅は描画が重いので間引いて更新する
+    if (w===0 || w>=120){ const n=performance.now(); if (n-lastDraw<150){ requestAnimationFrame(frame); return; } lastDraw=n; }
+    for (const c of charts) if (!c.data) c.draw(buf,t1,win);
+  }
+  for (const c of charts) if (c.data) c.draw();
+  requestAnimationFrame(frame);
+}
+setMode(1); initCharts(); updateNotes(); loadPorts().catch(()=>{}); openWs(); frame();
+</script>
+</body>
+</html>
