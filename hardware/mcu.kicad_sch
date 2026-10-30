@@ -4433,6 +4433,12 @@
 		(uuid "828d7abc-6044-4e48-b331-fb3168bbe7d7")
 	)
 	(junction
+		(at 41.91 167.64)
+		(diameter 0)
+		(color 0 0 0 0)
+		(uuid "8d9a9251-ff0b-45e1-a385-f9ebb6fc0883")
+	)
+	(junction
 		(at 92.71 34.29)
 		(diameter 0)
 		(color 0 0 0 0)
@@ -4509,6 +4515,12 @@
 		(diameter 0)
 		(color 0 0 0 0)
 		(uuid "c5fa043c-ab04-432a-9664-37f01c64b7ad")
+	)
+	(junction
+		(at 43.18 170.18)
+		(diameter 0)
+		(color 0 0 0 0)
+		(uuid "c7b14b7a-25c3-4069-b86a-fbc53592d185")
 	)
 	(junction
 		(at 118.11 100.33)
@@ -4596,6 +4608,16 @@
 	)
 	(wire
 		(pts
+			(xy 40.64 180.34) (xy 41.91 180.34)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "004fb52a-6725-4da0-92f0-51db812b5717")
+	)
+	(wire
+		(pts
 			(xy 194.31 100.33) (xy 196.85 100.33)
 		)
 		(stroke
@@ -4636,7 +4658,7 @@
 	)
 	(wire
 		(pts
-			(xy 40.64 170.18) (xy 45.72 170.18)
+			(xy 40.64 170.18) (xy 43.18 170.18)
 		)
 		(stroke
 			(width 0)
@@ -4686,6 +4708,16 @@
 	)
 	(wire
 		(pts
+			(xy 43.18 182.88) (xy 43.18 170.18)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "16052058-e61f-4e3f-9472-3a869fcb380a")
+	)
+	(wire
+		(pts
 			(xy 120.65 156.21) (xy 123.19 156.21)
 		)
 		(stroke
@@ -4713,6 +4745,16 @@
 			(type default)
 		)
 		(uuid "19be993d-66b1-4e49-878d-415650f1e172")
+	)
+	(wire
+		(pts
+			(xy 43.18 170.18) (xy 45.72 170.18)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "1baa33a4-0f81-4a4b-994c-6c513d227bb9")
 	)
 	(wire
 		(pts
@@ -4846,6 +4888,16 @@
 	)
 	(wire
 		(pts
+			(xy 41.91 180.34) (xy 41.91 167.64)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "282bea3e-6c1c-4ff5-8148-3cf000fc741c")
+	)
+	(wire
+		(pts
 			(xy 107.95 165.1) (xy 107.95 168.91)
 		)
 		(stroke
@@ -4926,7 +4978,7 @@
 	)
 	(wire
 		(pts
-			(xy 40.64 167.64) (xy 45.72 167.64)
+			(xy 40.64 167.64) (xy 41.91 167.64)
 		)
 		(stroke
 			(width 0)
@@ -5746,6 +5798,16 @@
 	)
 	(wire
 		(pts
+			(xy 40.64 182.88) (xy 43.18 182.88)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "a4687dc2-9e3d-4aa4-b4b6-f7085369f434")
+	)
+	(wire
+		(pts
 			(xy 212.09 85.09) (xy 212.09 73.66)
 		)
 		(stroke
@@ -6383,6 +6445,16 @@
 			(type default)
 		)
 		(uuid "f96b01df-4f9b-45a3-9db5-3fc026e85891")
+	)
+	(wire
+		(pts
+			(xy 41.91 167.64) (xy 45.72 167.64)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "f98a1ae8-9cc1-4326-8167-ae8c7af22a79")
 	)
 	(wire
 		(pts
@@ -11817,6 +11889,87 @@
 			(project "hqdd_1"
 				(path "/c2b90e11-c7ad-42c4-9037-fc077dd1a3c2/7bbdb4b5-f615-4e52-82a7-d8572e7f02d6"
 					(reference "C26")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "Connector_Generic:Conn_01x02")
+		(at 35.56 180.34 0)
+		(mirror y)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "ba031975-ba8e-456b-bae7-cc91baa7aaa8")
+		(property "Reference" "J8"
+			(at 35.56 173.99 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "Conn_01x02"
+			(at 35.56 176.53 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Footprint" "Connector_JST:JST_ZH_B2B-ZR_1x02_P1.50mm_Vertical"
+			(at 35.56 180.34 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 35.56 180.34 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" "Generic connector, single row, 01x02, script generated (kicad-library-utils/schlib/autogen/connector/)"
+			(at 35.56 180.34 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "2"
+			(uuid "e8336923-95f8-45e0-b730-25a893c170c0")
+		)
+		(pin "1"
+			(uuid "fc9cb14f-6b6c-4f4e-a182-bf2d99445382")
+		)
+		(instances
+			(project "hqdd_1"
+				(path "/c2b90e11-c7ad-42c4-9037-fc077dd1a3c2/7bbdb4b5-f615-4e52-82a7-d8572e7f02d6"
+					(reference "J8")
 					(unit 1)
 				)
 			)
